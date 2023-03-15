@@ -18,8 +18,14 @@ jobs:
       - name: Apply
         env:
           VERSION: ${{inputs.schema_version}}
+          GOBIN: /usr/local/bin/
         run: |
           echo `go version`
+          echo `which go`
           go install github.com/gruntwork-io/git-xargs@v0.1.4
+          echo $PATH
+          echo `which git-xargs`
           echo `git-xargs --version`
+          cd /usr/local/bin/
+          echo `ls`
           # git-xargs --dry-run --repos repos --branch-name chore/update-schema --commit-message "fix: update eventbus.schema (git-xargs)" --no-skip-ci "$(pwd)/update.sh"
