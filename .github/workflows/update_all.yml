@@ -27,6 +27,6 @@ jobs:
           echo `which cat`
           echo `jq version`
           echo `cat version`
-          apt-get install moreutils
+          sudo apt-get install moreutils
           echo `which sponge`
           echo `sponge version`
