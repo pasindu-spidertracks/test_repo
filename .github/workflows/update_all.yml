@@ -1,0 +1,25 @@
+name: Update all consumers of schema
+
+on:
+  workflow_dispatch:
+    inputs:
+      schema_version:
+        description: New version of the schema
+        default: "1.2.3"
+        type: string
+        required: true
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      # - uses: actions/checkout@v3
+      #   with:
+      #     token: ${{ secrets.ADMIN_GITHUB_PAT }}
+      - name: Apply
+        working-directory: xargs
+        env:
+          VERSION: ${{inputs.schema_version}}
+        run: |
+          which go
+          go --version
+          # git-xargs --dry-run --repos repos --branch-name chore/update-schema --commit-message "fix: update eventbus.schema (git-xargs)" --no-skip-ci "$(pwd)/update.sh"
