@@ -16,7 +16,6 @@ jobs:
       #   with:
       #     token: ${{ secrets.ADMIN_GITHUB_PAT }}
       - name: Apply
-        working-directory: xargs
         env:
           VERSION: ${{inputs.schema_version}}
         run: |
