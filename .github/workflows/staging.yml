@@ -1,0 +1,137 @@
+# NOTE: this file is centrally controlled via Terraform. Local changes risk being overwritten by IaC
+# updates. If you need actions specific to this repository alone, consider whether they can be
+# achieved by a separate workflow, or (worst case) whether we need to create an exception.
+#
+# https://github.com/spidertracks/eventbus.terraform/blob/master/template/.github/workflows/staging.yml
+name: Staging
+
+on:
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - '**.md'
+
+env:
+  ENVIRONMENT: test
+
+jobs:
+  deploy:
+    environment: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          always-auth: true
+          cache: npm
+          node-version: 16
+          registry-url: https://npm.pkg.github.com/
+          scope: '@spidertracks'
+      - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
+      - uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_CDK_ROLE }}
+          role-duration-seconds: 1200
+      - name: Optional pre Release to staging hook
+        if: ${{ hashFiles('./.github/actions/staging/pre/action.yml') != '' }}
+        uses: ./.github/actions/staging/pre/
+        with:
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_region: ${{ secrets.AWS_REGION }}
+          aws_cdk_role: ${{ secrets.AWS_CDK_ROLE }}
+          bastion_host: bastion.test.spidertracks.io
+          bastion_ssh_private_key: ${{ secrets.BASTION_SSH_PRIVATE_KEY_TEST }}
+          stl_vpn_psk: ${{ secrets.stl_vpn_psk }}
+          stl_vpn_user: ${{ secrets.stl_vpn_user }}
+          stl_vpn_pass: ${{ secrets.stl_vpn_pass }}
+
+      - run: npx cdk --require-approval never deploy
+        env:
+          DATADOG_API_KEY: ${{ secrets.DATADOG_API_KEY }}
+          DATADOG_SITE: ${{ secrets.DATADOG_SITE }}
+          NODE_ENV: ${{ env.ENVIRONMENT }}
+
+      - name: Optional post Release to staging hook
+        if: ${{ hashFiles('./.github/actions/staging/post/action.yml') != '' }}
+        uses: ./.github/actions/staging/post/
+        with:
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_region: ${{ secrets.AWS_REGION }}
+          aws_cdk_role: ${{ secrets.AWS_CDK_ROLE }}
+          bastion_host: bastion.test.spidertracks.io
+          bastion_ssh_private_key: ${{ secrets.BASTION_SSH_PRIVATE_KEY_TEST }}
+          stl_vpn_psk: ${{ secrets.stl_vpn_psk }}
+          stl_vpn_user: ${{ secrets.stl_vpn_user }}
+          stl_vpn_pass: ${{ secrets.stl_vpn_pass }}
+
+
+  e2e:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: git clone https://${{ secrets.ADMIN_GITHUB_PAT }}@github.com/Spidertracks/eventbus.test.git
+      - uses: pdm-project/setup-pdm@main
+        with:
+          cache: true
+          cache-dependency-path: '**/pdm.lock'
+          enable-pep582: true
+          python-version: "3.10"
+          version: 2.4.0
+      - uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_TEST }}
+          role-duration-seconds: 2400
+
+      - name: Install VPN
+        run: sudo apt-get install vpnc
+
+      - name: Configure VPN
+        run: |
+          echo 'IPSec gateway "office.spidertracks.io"' | sudo tee /etc/vpnc/stl.conf
+          echo 'IPSec ID dialup' | sudo tee -a /etc/vpnc/stl.conf
+          echo "IPSec secret ${{ secrets.stl_vpn_psk }}" | sudo tee -a /etc/vpnc/stl.conf
+          echo "Xauth username ${{ secrets.stl_vpn_user }}" | sudo tee -a /etc/vpnc/stl.conf
+          echo "Xauth password ${{ secrets.stl_vpn_pass }}" | sudo tee -a /etc/vpnc/stl.conf
+          echo 'Domain "LOCAL"' | sudo tee -a /etc/vpnc/stl.conf
+
+      - name: Start VPN
+        run: sudo vpnc stl.conf
+      
+      - name: Set Bastion key
+        run: |
+          echo "${{ secrets.BASTION_SSH_PRIVATE_KEY_TEST }}" | sed '/^$/d' - > /tmp/bastion_key.pem
+
+      - id: e2e
+        uses: ./eventbus.test/actions/eventbus-test-run
+        with:
+          feature-path: test/features/e2e-test/trotter-atu-e2e.feature
+        env:
+          STL_ENV: ${{ env.ENVIRONMENT }}
+          TEST_CLIENT_ID: ${{ github.event.repository.name }}-${{github.run_id }}-${{ github.run_attempt }}
+          EMAIL: automation-tests@spidertracks.co.nz
+          AFF_USERNAME: automation-tests@spidertracks.co.nz
+          AFF_PASSWORD: ${{ secrets.AUTOMATION_TEST_USER_PASSWORD_TEST_ENV }}
+          BASTION_HOST: bastion.test.spidertracks.io
+          BASTION_KEY: /tmp/bastion_key.pem
+          BASTION_USER: ec2-user
+      
+      - name: Remove Bastion key
+        run: |
+          sudo rm /tmp/bastion_key.pem
+
+      - name: Stop VPN
+        run: |
+          sudo vpnc-disconnect
+          sudo rm /etc/vpnc/stl.conf

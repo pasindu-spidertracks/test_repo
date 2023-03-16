@@ -1,0 +1,72 @@
+# NOTE: this file is centrally controlled via Terraform. Local changes risk being overwritten by IaC
+# updates. If you need actions specific to this repository alone, consider whether they can be
+# achieved by a separate workflow, or (worst case) whether we need to create an exception.
+#
+# https://github.com/spidertracks/eventbus.terraform/blob/master/template/.github/workflows/release.yml
+name: Release
+
+on: workflow_dispatch
+
+env:
+  ENVIRONMENT: prod
+
+jobs:
+  deploy:
+    environment: prod
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v3
+        with:
+          always-auth: true
+          cache: npm
+          node-version: 16
+          registry-url: https://npm.pkg.github.com/
+          scope: '@spidertracks'
+      - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
+      - uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_CDK_ROLE }}
+          role-duration-seconds: 1200
+
+      - name: Optional pre Release to prod hook
+        if: ${{ hashFiles('./.github/actions/prod/pre/action.yml') != '' }}
+        uses: ./.github/actions/dev/pre/
+        with:
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_region: ${{ secrets.AWS_REGION }}
+          aws_cdk_role: ${{ secrets.AWS_CDK_ROLE }}
+          bastion_host: bastion.spidertracks.io
+          bastion_ssh_private_key: ${{ secrets.BASTION_SSH_PRIVATE_KEY_PROD }}
+          stl_vpn_psk: ${{ secrets.stl_vpn_psk }}
+          stl_vpn_user: ${{ secrets.stl_vpn_user }}
+          stl_vpn_pass: ${{ secrets.stl_vpn_pass }}
+
+      - run: npx semantic-release
+         env:
+           DATADOG_API_KEY: ${{ secrets.DATADOG_API_KEY }}
+           DATADOG_SITE: ${{ secrets.DATADOG_SITE }}
+           GH_TOKEN: ${{ secrets.ADMIN_GITHUB_PAT }}
+           NODE_ENV: ${{ env.ENVIRONMENT }}
+
+      - name: Optional post Release to prod hook
+          if: ${{ hashFiles('./.github/actions/prod/post/action.yml') != '' }}
+          uses: ./.github/actions/prod/post/
+          with:
+            aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+            aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            aws_region: ${{ secrets.AWS_REGION }}
+            aws_cdk_role: ${{ secrets.AWS_CDK_ROLE }}
+            bastion_host: bastion.spidertracks.io
+            bastion_ssh_private_key: ${{ secrets.BASTION_SSH_PRIVATE_KEY_PROD }}
+            stl_vpn_psk: ${{ secrets.stl_vpn_psk }}
+            stl_vpn_user: ${{ secrets.stl_vpn_user }}
+            stl_vpn_pass: ${{ secrets.stl_vpn_pass }}
