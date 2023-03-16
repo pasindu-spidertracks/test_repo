@@ -51,11 +51,11 @@ jobs:
           stl_vpn_pass: ${{ secrets.stl_vpn_pass }}
 
       - run: npx semantic-release
-         env:
-           DATADOG_API_KEY: ${{ secrets.DATADOG_API_KEY }}
-           DATADOG_SITE: ${{ secrets.DATADOG_SITE }}
-           GH_TOKEN: ${{ secrets.ADMIN_GITHUB_PAT }}
-           NODE_ENV: ${{ env.ENVIRONMENT }}
+        env:
+          DATADOG_API_KEY: ${{ secrets.DATADOG_API_KEY }}
+          DATADOG_SITE: ${{ secrets.DATADOG_SITE }}
+          GH_TOKEN: ${{ secrets.ADMIN_GITHUB_PAT }}
+          NODE_ENV: ${{ env.ENVIRONMENT }}
 
       - name: Optional post Release to prod hook
           if: ${{ hashFiles('./.github/actions/prod/post/action.yml') != '' }}
