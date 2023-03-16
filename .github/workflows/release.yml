@@ -24,7 +24,7 @@ jobs:
           cache: npm
           node-version: 16
           registry-url: https://npm.pkg.github.com/
-          scope: '@spidertracks'
+          scope: "@spidertracks"
       - run: npm ci
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
@@ -58,15 +58,15 @@ jobs:
           NODE_ENV: ${{ env.ENVIRONMENT }}
 
       - name: Optional post Release to prod hook
-          if: ${{ hashFiles('./.github/actions/prod/post/action.yml') != '' }}
-          uses: ./.github/actions/prod/post/
-          with:
-            aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-            aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-            aws_region: ${{ secrets.AWS_REGION }}
-            aws_cdk_role: ${{ secrets.AWS_CDK_ROLE }}
-            bastion_host: bastion.spidertracks.io
-            bastion_ssh_private_key: ${{ secrets.BASTION_SSH_PRIVATE_KEY_PROD }}
-            stl_vpn_psk: ${{ secrets.stl_vpn_psk }}
-            stl_vpn_user: ${{ secrets.stl_vpn_user }}
-            stl_vpn_pass: ${{ secrets.stl_vpn_pass }}
+        if: ${{ hashFiles('./.github/actions/prod/post/action.yml') != '' }}
+        uses: ./.github/actions/prod/post/
+        with:
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_region: ${{ secrets.AWS_REGION }}
+          aws_cdk_role: ${{ secrets.AWS_CDK_ROLE }}
+          bastion_host: bastion.spidertracks.io
+          bastion_ssh_private_key: ${{ secrets.BASTION_SSH_PRIVATE_KEY_PROD }}
+          stl_vpn_psk: ${{ secrets.stl_vpn_psk }}
+          stl_vpn_user: ${{ secrets.stl_vpn_user }}
+          stl_vpn_pass: ${{ secrets.stl_vpn_pass }}
