@@ -7,7 +7,9 @@ on:
     paths-ignore:
       - "**.md"
   workflow_call:
-
+    secrets:
+      GH_SECRET_1:
+        required: true
 env:
   TARGET_ENV: dev
   SECRET_1: ${{ secrets.GH_SECRET_1 }}
