@@ -3,7 +3,15 @@ name: caller_wf
 on: workflow_dispatch
 
 jobs:
+  init:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print Init
+        run: |
+          echo init
+
   call-workflow-2-in-local-repo:
+    needs: init
     uses: ./.github/workflows/reusable_wf.yml
     secrets:
       GH_SECRET_1: ${{ secrets.GH_SECRET_1 }}
