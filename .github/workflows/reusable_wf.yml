@@ -1,0 +1,23 @@
+name: reusable_wf
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "**.md"
+  workflow_call:
+
+env:
+  TARGET_ENV: dev
+  SECRET_1: ${{ secrets.GH_SECRET_1 }}
+
+jobs:
+  deploy-api-waf:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print
+        run: |
+          echo env ${{ env.SECRET_1 }}
+          echo secret ${{ secrets.GH_SECRET_1 }}
+          echo env ${{ env.TARGET_ENV }}
